@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"image"
@@ -19,12 +20,18 @@ import (
 	"github.com/corona10/goimagehash"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	"github.com/nfnt/resize"
 )
 
-var (
-	hashList = make(map[string]string)
-)
+type ImageMeta struct {
+	ID       int
+	Hash     string
+	HashType string
+	Url      string
+}
+
+var db *sql.DB
 
 func main() {
 	// load .env file
@@ -33,6 +40,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
+
+	// connect to db
+	// db, err := sql.Open("postgres://myuser:mypassword@localhost/mydb?sslmode=disable")
+	// if err != nil {
+	// 	// Handle error
+	// }
+
+	db, err = sql.Open("postgres", "host=localhost port=5432 user=myuser password=mypassword dbname=mydb sslmode=disable")
+	if err != nil {
+		panic(err)
+	}
+
+	defer db.Close()
 
 	router := gin.Default()
 	router.POST("/check", uploadImage)
@@ -138,7 +158,7 @@ func uploadImage(c *gin.Context) {
 
 	defer src.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	//create cloudinary instance
@@ -148,23 +168,43 @@ func uploadImage(c *gin.Context) {
 		return
 	}
 
-	fmt.Println("=============================================================")
-	fmt.Println(os.Getenv("CLOUDINARY_CLOUD_NAME"))
-	fmt.Println(os.Getenv("CLOUDINARY_API_KEY"))
-	fmt.Println(os.Getenv("CLOUDINARY_API_SECRET"))
-
 	//upload file
 	uploadParam, err := cld.Upload.Upload(ctx, src, uploader.UploadParams{Folder: os.Getenv("CLOUDINARY_UPLOAD_FOLDER")})
 	if err != nil {
 		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
-	// return uploadParam.SecureURL, nil
+
+	// save to db
+	imgMeta := ImageMeta{
+		Hash:     "121212",
+		HashType: "blabla",
+		Url:      uploadParam.SecureURL,
+	}
+
+	res, err := saveData(imgMeta)
+
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	// Return the public URL of the uploaded image
-	c.JSON(http.StatusOK, gin.H{
-		"url": uploadParam.SecureURL,
-	})
+	c.JSON(http.StatusOK, res)
 }
 
-// how to connect
+func saveData(image ImageMeta) (*ImageMeta, error) {
+	// Query database for similar images
+	sql := "INSERT INTO image_meta (hash, hash_type, url) VALUES($1, $2, $3) RETURNING id, hash, hash_type, url"
+
+	err := db.QueryRow(sql, image.Hash, image.HashType, image.Url).Scan(&image.ID, &image.Hash, &image.HashType, &image.Url)
+	result := &image
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("=======================================================================")
+	fmt.Println(result)
+	return result, nil
+}
