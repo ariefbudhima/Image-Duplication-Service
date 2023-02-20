@@ -190,9 +190,7 @@ func uploadImage(c *gin.Context) {
 	}
 
 	// Return the public URL of the uploaded image
-	c.JSON(http.StatusOK, gin.H{
-		"data": res,
-	})
+	c.JSON(http.StatusOK, res)
 }
 
 func saveData(image ImageMeta) (*ImageMeta, error) {
