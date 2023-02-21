@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -32,6 +33,13 @@ type ImageMeta struct {
 	Hash     int64
 	HashType string
 	Url      string
+	Metadata Metadata `json:"metadata"`
+}
+
+type Metadata struct {
+	NamaPetani string
+	Alamat     string
+	Kota       string
 }
 
 var db *sql.DB
@@ -155,31 +163,39 @@ func checkDuplicate(c *gin.Context) {
 	// image already found, return error, return url
 	if err == nil {
 		c.JSON(http.StatusAccepted, gin.H{
-			"error": "image already exist",
-			"url":   datas.Url,
+			"error":    "image already exist",
+			"metadata": datas.Metadata,
+			"url":      datas.Url,
 		})
 		return
 	}
 
 	if err != sql.ErrNoRows {
-		c.String(http.StatusInternalServerError, err.Error())
+		c.String(http.StatusInternalServerError, "err.Error()")
 		return
 	}
 
 	// upload image if hash is not exist
 	url, err := uploadImage(c)
 
+	// create metadata
+	metadata := Metadata{
+		NamaPetani: c.Request.FormValue("nama_petani"),
+		Alamat:     c.Request.FormValue("alamat"),
+		Kota:       c.Request.FormValue("kota"),
+	}
 	// save to db
 	imgMeta := ImageMeta{
 		Hash:     int64(hash),
 		HashType: "PerceptualHash",
 		Url:      url,
+		Metadata: metadata,
 	}
 
 	res, err := saveData(imgMeta)
 
 	if err != nil {
-		c.String(http.StatusInternalServerError, err.Error())
+		c.String(http.StatusInternalServerError, "err.Error()")
 		return
 	}
 
@@ -189,13 +205,21 @@ func checkDuplicate(c *gin.Context) {
 
 func getImageByHash(hash uint64) (*ImageMeta, error) {
 	var img ImageMeta
-	err := db.QueryRow("SELECT id, hash, hash_type, url FROM image_meta WHERE hash = $1", int64(hash)).Scan(&img.ID, &img.Hash, &img.HashType, &img.Url)
+	var metadata string
+	// var metadataJSON []byte
+	err := db.QueryRow("SELECT id, hash, hash_type, url, metadata FROM image_meta WHERE hash = $1", int64(hash)).Scan(&img.ID, &img.Hash, &img.HashType, &img.Url, &metadata)
 
 	if err == sql.ErrNoRows {
 		return nil, sql.ErrNoRows
 	} else if err != nil {
 		return nil, err
 	}
+
+	err = json.Unmarshal([]byte(metadata), &img.Metadata)
+	if err != nil {
+		return nil, err
+	}
+
 	return &img, nil
 }
 
@@ -224,7 +248,7 @@ func uploadImage(c *gin.Context) (string, error) {
 	//upload file
 	uploadParam, err := cld.Upload.Upload(ctx, src, uploader.UploadParams{Folder: os.Getenv("CLOUDINARY_UPLOAD_FOLDER")})
 	if err != nil {
-		c.String(http.StatusInternalServerError, err.Error())
+		c.String(http.StatusInternalServerError, "error di sini kah?")
 		return "", err
 	}
 
@@ -233,9 +257,14 @@ func uploadImage(c *gin.Context) (string, error) {
 
 func saveData(image ImageMeta) (*ImageMeta, error) {
 	// Query database for similar images
-	sql := "INSERT INTO image_meta (hash, hash_type, url) VALUES($1, $2, $3) RETURNING id, hash, hash_type, url"
+	sql := "INSERT INTO image_meta (hash, hash_type, url, metadata) VALUES($1, $2, $3, $4) RETURNING id, hash, hash_type, url, metadata"
 
-	err := db.QueryRow(sql, image.Hash, image.HashType, image.Url).Scan(&image.ID, &image.Hash, &image.HashType, &image.Url)
+	metadataJSON, err := json.Marshal(image.Metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.QueryRow(sql, image.Hash, image.HashType, image.Url, metadataJSON).Scan(&image.ID, &image.Hash, &image.HashType, &image.Url, &image.Metadata)
 	result := &image
 
 	if err != nil {
