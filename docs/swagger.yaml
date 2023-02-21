@@ -1,0 +1,51 @@
+info:
+  contact: {}
+paths:
+  /check:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Check if an image is a duplicate by comparing its Perceptual hash
+        with existing hashes in the database
+      parameters:
+      - description: Image file to upload
+        in: formData
+        name: image
+        required: true
+        type: file
+      - description: Petani's name
+        in: formData
+        name: nama_petani
+        required: true
+        type: string
+      - description: Address
+        in: formData
+        name: alamat
+        required: true
+        type: string
+      - description: City
+        in: formData
+        name: kota
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns the public URL of the uploaded image
+          schema:
+            type: string
+        "202":
+          description: Returns the error and URL of the image if already exists
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Check for duplicate images
+swagger: "2.0"
