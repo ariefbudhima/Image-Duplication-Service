@@ -14,6 +14,8 @@ import (
 	"os"
 	"time"
 
+	"example.com/image-duplication-service/docs"
+
 	"github.com/cloudinary/cloudinary-go"
 	"github.com/cloudinary/cloudinary-go/api/uploader"
 	"github.com/corona10/goimagehash"
@@ -21,6 +23,8 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/nfnt/resize"
+	swaggerFiles "github.com/swaggo/files"
+	"github.com/swaggo/gin-swagger"
 )
 
 type ImageMeta struct {
@@ -51,11 +55,28 @@ func main() {
 
 	defer db.Close()
 
+	docs.SwaggerInfo.Title = "Swagger Image Duplication API"
+	docs.SwaggerInfo.Description = "This is a sample server image dupication server."
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = "localhost:8081"
+	docs.SwaggerInfo.Schemes = []string{"http", "https"}
+
 	router := gin.Default()
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.POST("/check", checkDuplicate)
 	router.Run(":8081")
 }
 
+// @Summary Check for duplicate images
+// @Description Check if an image is a duplicate by comparing its Perceptual hash with existing hashes in the database
+// @Accept  multipart/form-data
+// @Produce json
+// @Param   image     formData   file    true   "Image file to upload"
+// @Success 200 {object} string "Returns the public URL of the uploaded image"
+// @Success 202 {object} string "Returns the error and URL of the image if already exists"
+// @Failure 400 {string} string "Bad Request"
+// @Failure 500 {string} string "Internal Server Error"
+// @Router /check [post]
 func checkDuplicate(c *gin.Context) {
 	file, err := c.FormFile("image")
 	if err != nil {
