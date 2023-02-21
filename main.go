@@ -80,6 +80,9 @@ func main() {
 // @Accept  multipart/form-data
 // @Produce json
 // @Param   image     formData   file    true   "Image file to upload"
+// @Param   nama_petani     formData   string    true   "Petani's name"
+// @Param   alamat     formData   string    true   "Address"
+// @Param   kota     formData   string    true   "City"
 // @Success 200 {object} string "Returns the public URL of the uploaded image"
 // @Success 202 {object} string "Returns the error and URL of the image if already exists"
 // @Failure 400 {string} string "Bad Request"
@@ -171,7 +174,7 @@ func checkDuplicate(c *gin.Context) {
 	}
 
 	if err != sql.ErrNoRows {
-		c.String(http.StatusInternalServerError, "err.Error()")
+		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -195,7 +198,7 @@ func checkDuplicate(c *gin.Context) {
 	res, err := saveData(imgMeta)
 
 	if err != nil {
-		c.String(http.StatusInternalServerError, "err.Error()")
+		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -257,6 +260,7 @@ func uploadImage(c *gin.Context) (string, error) {
 
 func saveData(image ImageMeta) (*ImageMeta, error) {
 	// Query database for similar images
+	var metadata string
 	sql := "INSERT INTO image_meta (hash, hash_type, url, metadata) VALUES($1, $2, $3, $4) RETURNING id, hash, hash_type, url, metadata"
 
 	metadataJSON, err := json.Marshal(image.Metadata)
@@ -264,7 +268,9 @@ func saveData(image ImageMeta) (*ImageMeta, error) {
 		return nil, err
 	}
 
-	err = db.QueryRow(sql, image.Hash, image.HashType, image.Url, metadataJSON).Scan(&image.ID, &image.Hash, &image.HashType, &image.Url, &image.Metadata)
+	err = db.QueryRow(sql, image.Hash, image.HashType, image.Url, metadataJSON).Scan(&image.ID, &image.Hash, &image.HashType, &image.Url, &metadata)
+	err = json.Unmarshal([]byte(metadata), &image.Metadata)
+
 	result := &image
 
 	if err != nil {

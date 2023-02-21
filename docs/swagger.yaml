@@ -13,6 +13,21 @@ paths:
         name: image
         required: true
         type: file
+      - description: Petani's name
+        in: formData
+        name: nama_petani
+        required: true
+        type: string
+      - description: Address
+        in: formData
+        name: alamat
+        required: true
+        type: string
+      - description: City
+        in: formData
+        name: kota
+        required: true
+        type: string
       produces:
       - application/json
       responses:

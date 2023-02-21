@@ -32,6 +32,27 @@ const docTemplate = `{
                         "name": "image",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Petani's name",
+                        "name": "nama_petani",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Address",
+                        "name": "alamat",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "City",
+                        "name": "kota",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
